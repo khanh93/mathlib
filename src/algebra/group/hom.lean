@@ -5,6 +5,7 @@ Authors: Patrick Massot, Kevin Buzzard, Scott Morrison, Johan Commelin, Chris Hu
   Johannes Hölzl, Yury Kudryashov
 -/
 import algebra.group.basic
+import tactic.norm_cast
 
 /-!
 # monoid and group homomorphisms
@@ -131,8 +132,9 @@ def id (M : Type*) [monoid M] : M →* M :=
   map_one' := rfl,
   map_mul' := λ _ _, rfl }
 
-@[simp, to_additive] lemma id_apply {M : Type*} [monoid M] (x : M) :
-  id M x = x := rfl
+@[simp, to_additive] lemma coe_id {M : Type*} [monoid M] : ⇑(id M) = _root_.id := rfl
+
+attribute [norm_cast] coe_id add_monoid_hom.coe_id
 
 include mM mN mP
 
@@ -143,8 +145,10 @@ def comp (hnp : N →* P) (hmn : M →* N) : M →* P :=
   map_one' := by simp,
   map_mul' := by simp }
 
-@[simp, to_additive] lemma comp_apply (g : N →* P) (f : M →* N) (x : M) :
-  g.comp f x = g (f x) := rfl
+@[simp, to_additive] lemma coe_comp (g : N →* P) (f : M →* N) :
+  ⇑(g.comp f) = g ∘ f := rfl
+
+attribute [norm_cast] coe_comp add_monoid_hom.coe_comp
 
 /-- Composition of monoid homomorphisms is associative. -/
 @[to_additive] lemma comp_assoc {Q : Type*} [monoid Q] (f : M →* N) (g : N →* P) (h : P →* Q) :
@@ -158,7 +162,7 @@ lemma cancel_right {g₁ g₂ : N →* P} {f : M →* N} (hf : function.surjecti
 @[to_additive]
 lemma cancel_left {g : N →* P} {f₁ f₂ : M →* N} (hg : function.injective g) :
   g.comp f₁ = g.comp f₂ ↔ f₁ = f₂ :=
-⟨λ h, monoid_hom.ext $ λ x, hg $ by rw [← comp_apply, h, comp_apply], λ h, h ▸ rfl⟩
+⟨λ h, monoid_hom.ext $ λ x, hg $ by exact monoid_hom.ext_iff.1 h x, λ h, h ▸ rfl⟩
 
 omit mP
 
@@ -176,7 +180,9 @@ protected def one : M →* N :=
 @[to_additive]
 instance : has_one (M →* N) := ⟨monoid_hom.one⟩
 
-@[simp, to_additive] lemma one_apply (x : M) : (1 : M →* N) x = 1 := rfl
+@[simp, to_additive] lemma coe_one : ⇑(1 : M →* N) = function.const M 1 := rfl
+
+attribute [norm_cast] coe_one add_monoid_hom.coe_zero
 
 @[to_additive]
 instance : inhabited (M →* N) := ⟨1⟩
@@ -212,7 +218,7 @@ instance {M N} [monoid M] [comm_monoid N] : comm_monoid (M →* N) :=
 @[to_additive "`flip` arguments of `f : M →+ N →+ P`"]
 def flip {mM : monoid M} {mN : monoid N} {mP : comm_monoid P} (f : M →* N →* P) :
   N →* M →* P :=
-{ to_fun := λ y, ⟨λ x, f x y, by rw [f.map_one, one_apply], λ x₁ x₂, by rw [f.map_mul, mul_apply]⟩,
+{ to_fun := λ y, ⟨λ x, f x y, by simp, λ x₁ x₂, by simp⟩,
   map_one' := ext $ λ x, (f x).map_one,
   map_mul' := λ y₁ y₂, ext $ λ x, (f x).map_mul y₁ y₂ }
 

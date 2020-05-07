@@ -2,18 +2,24 @@
 Copyright (c) 2016 Johannes Hölzl. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Johannes Hölzl, Mario Carneiro
-
-Miscellaneous function constructions and lemmas.
 -/
 import logic.basic
 import data.option.defs
+
+/-!
+# Miscellaneous function constructions and lemmas
+-/
 
 universes u v w
 
 namespace function
 
 section
-variables {α : Sort u} {β : Sort v} {f : α → β}
+variables {α : Sort u} {β : Sort v} {γ : Sort w} {f : α → β}
+
+@[simp] lemma id_apply (x : α) : id x = x := rfl
+@[simp] lemma const_apply (x : α) (y : β) : const α y x = y := rfl
+@[simp] lemma flip_apply (f : α → β → γ) (x : α) (y : β) : flip f y x = f x y := rfl
 
 lemma hfunext {α α': Sort u} {β : α → Sort v} {β' : α' → Sort v} {f : Πa, β a} {f' : Πa, β' a}
   (hα : α = α') (h : ∀a a', a == a' → f a == f' a') : f == f' :=
