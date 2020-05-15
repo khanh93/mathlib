@@ -14,6 +14,8 @@ import topology.metric_space.antilipschitz
 
 variables {α : Type*} {β : Type*} {γ : Type*} {ι : Type*}
 
+set_option class.instance_max_depth 20
+
 noncomputable theory
 open filter metric
 open_locale topological_space big_operators
@@ -665,7 +667,21 @@ instance : nondiscrete_normed_field ℚ :=
 @[norm_cast, simp] lemma int.norm_cast_rat (m : ℤ) : ∥(m : ℚ)∥ = ∥m∥ :=
 by rw [← rat.norm_cast_real, ← int.norm_cast_real]; congr' 1; norm_cast
 
+section normed_module
+
+section prio
+set_option default_priority 100 -- see Note [default priority]
+/-- A normed module over a normed ring is a module endowed with a norm which satisfies the
+equality `∥c • x∥ ≤ ∥c∥ ∥x∥`. -/
+class normed_module (α : Type*) (β : Type*) [normed_ring α] [normed_group β]
+  extends module α β :=
+(norm_smul_le : ∀ (a:α) (b:β), norm (a • b) ≤ has_norm.norm a * norm b)
+end prio
+
+end normed_module
+
 section normed_space
+open_locale classical
 
 section prio
 set_option default_priority 100 -- see Note [default priority]
@@ -682,17 +698,38 @@ variables [normed_field α] [normed_group β]
 instance normed_field.to_normed_space : normed_space α α :=
 { norm_smul := normed_field.norm_mul }
 
+instance normed_space.to_normed_module [normed_space α β] : normed_module α β :=
+{ norm_smul_le := λ s x, le_of_eq (normed_space.norm_smul s x)}
 
-lemma norm_smul [normed_space α β] (s : α) (x : β) : ∥s • x∥ = ∥s∥ * ∥x∥ :=
+/-- Over a normed field, `∥c • x∥ = ∥c∥ ∥x∥` automatically implies `∥c • x∥ = ∥c∥ ∥x∥`. -/
+instance normed_space.of_normed_module [normed_module α β] : normed_space α β :=
+{ norm_smul := begin
+  { intros s x,
+    by_cases h : s = 0,
+    { rw [h, zero_smul, norm_zero, norm_zero, zero_mul] },
+    { have hnneg : 0 ≤ ∥s∥ := norm_nonneg s,
+    apply le_antisymm,
+    { exact normed_module.norm_smul_le s x },
+    { have hinv : ∥x∥ ≤ ∥1 / s∥ * ∥s • x∥,
+      { calc ∥x∥ = ∥(1 : α) • x∥ : by rw one_smul
+        ... = ∥(1 / s * s ) • x∥ : by rw (div_mul_cancel 1 h)
+        ... = ∥(1 / s) • ( s • x)∥ : by rw ← mul_smul
+        ... ≤ ∥1 / s∥ * ∥s • x∥ : normed_module.norm_smul_le (1 / s) (s • x) },
+      calc ∥s∥ * ∥x∥  ≤ ∥s∥ * (∥1 / s∥ * ∥s • x∥) : mul_le_mul_of_nonneg_left hinv hnneg
+      ... = ∥s * (1 / s)∥ * ∥s • x∥ : by rw [← mul_assoc, normed_field.norm_mul]
+      ... = ∥s • x∥ : by rw [mul_div_cancel' 1 h, normed_field.norm_one, one_mul] } } }
+end }
+
+@[simp] lemma norm_smul [normed_space α β] (s : α) (x : β) : ∥s • x∥ = ∥s∥ * ∥x∥ :=
 normed_space.norm_smul s x
 
-lemma dist_smul [normed_space α β] (s : α) (x y : β) : dist (s • x) (s • y) = ∥s∥ * dist x y :=
+@[simp] lemma dist_smul [normed_space α β] (s : α) (x y : β) : dist (s • x) (s • y) = ∥s∥ * dist x y :=
 by simp only [dist_eq_norm, (norm_smul _ _).symm, smul_sub]
 
-lemma nnnorm_smul [normed_space α β] (s : α) (x : β) : nnnorm (s • x) = nnnorm s * nnnorm x :=
+@[simp] lemma nnnorm_smul [normed_space α β] (s : α) (x : β) : nnnorm (s • x) = nnnorm s * nnnorm x :=
 nnreal.eq $ norm_smul s x
 
-lemma nndist_smul [normed_space α β] (s : α) (x y : β) :
+@[simp] lemma nndist_smul [normed_space α β] (s : α) (x y : β) :
   nndist (s • x) (s • y) = nnnorm s * nndist x y :=
 nnreal.eq $ dist_smul s x y
 
@@ -795,9 +832,25 @@ class normed_algebra (𝕜 : Type*) (𝕜' : Type*) [normed_field 𝕜] [normed_
 (norm_algebra_map_eq : ∀x:𝕜, ∥algebra_map 𝕜 𝕜' x∥ = ∥x∥)
 end prio
 
+variables {𝕜 : Type*} [normed_field 𝕜]
+variables {𝕜' : Type*} [normed_ring 𝕜']
+
 @[simp] lemma norm_algebra_map_eq {𝕜 : Type*} (𝕜' : Type*) [normed_field 𝕜] [normed_ring 𝕜']
   [h : normed_algebra 𝕜 𝕜'] (x : 𝕜) : ∥algebra_map 𝕜 𝕜' x∥ = ∥x∥ :=
 normed_algebra.norm_algebra_map_eq _
+
+instance to_normed_module [h : normed_algebra 𝕜 𝕜'] : normed_module 𝕜 𝕜' :=
+{ norm_smul_le := begin
+    intros a x,
+    have h : a • x = ((algebra_map 𝕜 𝕜') a) * x, rw h.smul_def', by exact rfl,
+    calc ∥a • x∥ = ∥((algebra_map 𝕜 𝕜') a) * x∥ : by rw h
+    ... ≤ ∥algebra_map 𝕜 𝕜' a∥ * ∥x∥ : normed_ring.norm_mul _ _
+    ... = ∥a∥ * ∥x∥ : by rw norm_algebra_map_eq,
+  end,
+  ..h }
+
+instance to_normed_space [h : normed_algebra 𝕜 𝕜'] : normed_space 𝕜 𝕜' :=
+normed_space.of_normed_module
 
 end normed_algebra
 
